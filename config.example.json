@@ -1,0 +1,49 @@
+{
+  "inputs": [
+    {
+      "path": "/var/log/gatesignal/access.log",
+      "start_position": "end"
+    }
+  ],
+  "redis": {
+    "address": "127.0.0.1:6379",
+    "db": 0,
+    "namespace": "gatesignal-shadow"
+  },
+  "http": {
+    "listen": "127.0.0.1:9194"
+  },
+  "signals": {
+    "mode": "shadow",
+    "gatehub_url": "https://gatehub.example.com",
+    "instance_id": "central-logs",
+    "alert_connections": 10,
+    "window_minutes": 2,
+    "error_percent": 80,
+    "suspicious_uris": [
+      "(?i)(?:^|/)\\.git(?:/|$)",
+      "(?i)(?:^|/)wp-login\\.php$"
+    ],
+    "publish_interval_seconds": 5,
+    "outbox_max_items": 10000
+  },
+  "analytics": {
+    "mode": "shadow",
+    "sites": {
+      "example": "www.example.com"
+    },
+    "url": "https://analytics.example.com",
+    "export_interval_seconds": 300,
+    "request_timeout_seconds": 5,
+    "retention_days": 8,
+    "excluded_nets": ["192.0.2.0/24"],
+    "excluded_uris": ["^/healthz$"],
+    "static_extensions": [".css", ".js", ".png", ".svg", ".woff2"],
+    "monitoring_user_agents": ["(?i)uptime"],
+    "bot_user_agents": ["(?i)bot|crawler|spider"],
+    "internal_referrer_domains": ["example.com", "www.example.com"],
+    "queue_size": 1024,
+    "top_limit": 20,
+    "outbox_max_items": 1000
+  }
+}

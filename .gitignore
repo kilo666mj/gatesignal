@@ -1,0 +1,5 @@
+/gatesignal
+/dist/
+*.local.json
+*.token
+*.secret

@@ -1,0 +1,24 @@
+[Unit]
+Description=Convert web access logs into privacy-limited signals
+After=network-online.target redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gatesignal
+Group=gatesignal
+Environment=GATESIGNAL_REDIS_PASSWORD_FILE=/etc/gatesignal/redis-password
+Environment=GATESIGNAL_GATEHUB_TOKEN_FILE=/etc/gatesignal/gatehub-token
+Environment=GATESIGNAL_ANALYTICS_SECRET_FILE=/etc/gatesignal/analytics-secret
+Environment=GATESIGNAL_ANALYTICS_TOKEN_FILE=/etc/gatesignal/analytics-token
+ExecStart=/usr/local/bin/gatesignal -config /etc/gatesignal/config.json
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/var/log/gatesignal
+
+[Install]
+WantedBy=multi-user.target

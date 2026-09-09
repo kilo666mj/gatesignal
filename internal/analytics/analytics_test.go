@@ -1,0 +1,37 @@
+package analytics
+
+import (
+	"context"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/alicebob/miniredis/v2"
+	"github.com/kilo666mj/gatesignal/internal/accesslog"
+	"github.com/kilo666mj/gatesignal/internal/config"
+	"github.com/kilo666mj/gatesignal/internal/metrics"
+	"github.com/kilo666mj/gatesignal/internal/store"
+)
+
+func TestPrivacyLimitedAggregation(t *testing.T) {
+	mini := miniredis.RunT(t)
+	state := store.New(mini.Addr(), "", 0, "test")
+	t.Cleanup(func() { _ = state.Close() })
+	cfg := config.Analytics{Mode: "shadow", Sites: map[string]string{"example": "web.example.com"}, Secret: "visitor-secret", RetentionDays: 8, QueueSize: 10, TopLimit: 20, OutboxMaxItems: 100}
+	a, err := New(cfg, state, metrics.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	event := accesslog.Event{ObservedAt: time.Date(2026, 9, 9, 10, 0, 0, 0, time.UTC), Site: "example", IP: "192.0.2.10", Method: "GET", Target: "/private?token=secret", Status: 200, Bytes: 123, Referrer: "https://search.example.org/?q=secret", Agent: "browser"}
+	if err := a.aggregate(context.Background(), event); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range mini.Keys() {
+		if strings.Contains(key, "token=secret") || strings.Contains(key, "192.0.2.10") || strings.Contains(key, "browser") {
+			t.Fatalf("sensitive value in key %q", key)
+		}
+	}
+	if _, err := mini.ZScore("test:analytics:web.example.com:20260909T10:paths", "/private"); err != nil {
+		t.Fatal(err)
+	}
+}
