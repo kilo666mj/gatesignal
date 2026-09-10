@@ -44,3 +44,14 @@ func TestPublishRequiresStablePipelineAndValidLease(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestShadowPipelineValidatesLease(t *testing.T) {
+	cfg := defaults()
+	cfg.Inputs = []Input{{Path: "/tmp/access.log"}}
+	cfg.Signals.Mode = "shadow"
+	cfg.Publisher.PipelineID = "central-web"
+	cfg.Publisher.LeaseTTLSeconds = 0
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("accepted configured shadow publisher without a valid lease")
+	}
+}

@@ -46,7 +46,8 @@ Before publication, run every HA instance with the same production Redis
 namespace and `publisher.pipeline_id`. Verify that exactly one instance reports
 `gatesignal_publisher_owner 1`, then exercise lease transfer by stopping that
 instance. The peer must become owner after the lease TTL without duplicating
-the deterministic signal or analytics identity.
+the deterministic signal or analytics identity. Ownership election runs in
+shadow mode, while external publication remains disabled.
 
 ## 4. Cut over one output at a time
 

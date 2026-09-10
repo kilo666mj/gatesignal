@@ -154,10 +154,10 @@ func (cfg Config) Validate() error {
 		return fmt.Errorf("http.listen is required")
 	}
 	publishing := cfg.Signals.Mode == "publish" || cfg.Analytics.Mode == "publish"
-	if publishing {
-		if strings.TrimSpace(cfg.Publisher.PipelineID) == "" {
-			return fmt.Errorf("publisher.pipeline_id is required when an output publishes")
-		}
+	if publishing && strings.TrimSpace(cfg.Publisher.PipelineID) == "" {
+		return fmt.Errorf("publisher.pipeline_id is required when an output publishes")
+	}
+	if strings.TrimSpace(cfg.Publisher.PipelineID) != "" {
 		if cfg.Publisher.LeaseTTLSeconds <= 0 || cfg.Publisher.RenewIntervalSeconds <= 0 || cfg.Publisher.RenewIntervalSeconds*2 >= cfg.Publisher.LeaseTTLSeconds {
 			return fmt.Errorf("publisher lease TTL must be positive and more than twice the renew interval")
 		}

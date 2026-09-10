@@ -54,7 +54,7 @@ func run(configPath string) error {
 		return fmt.Errorf("connect to Redis: %w", err)
 	}
 	var ownership publisher.Ownership
-	if cfg.Signals.Mode == "publish" || cfg.Analytics.Mode == "publish" {
+	if cfg.Publisher.PipelineID != "" {
 		lease, err := publisher.NewLease(state, telemetry, time.Duration(cfg.Publisher.LeaseTTLSeconds)*time.Second, time.Duration(cfg.Publisher.RenewIntervalSeconds)*time.Second)
 		if err != nil {
 			return err

@@ -78,6 +78,8 @@ Redis namespace. The pipeline ID replaces the collector hostname in analytics
 bucket identity, so failover retries update the same site/hour bucket instead
 of creating a duplicate. Only the renewable lease holder sends external
 requests; non-owners continue aggregation and durable queueing.
+The lease is active in shadow mode when a pipeline ID is configured, allowing
+ownership and failover to be verified before either output is enabled.
 
 ## Log routing
 
