@@ -18,6 +18,9 @@ type Metrics struct {
 	LinesUnmatched          atomic.Uint64
 	TailRestarts            atomic.Uint64
 	RedisFailures           atomic.Uint64
+	PublisherOwner          atomic.Bool
+	PublisherLeaseFailures  atomic.Uint64
+	PublisherTransitions    atomic.Uint64
 	SignalsDetected         atomic.Uint64
 	SignalsQueued           atomic.Uint64
 	SignalsPublished        atomic.Uint64
@@ -64,6 +67,12 @@ gatesignal_lines_unmatched_total %d
 gatesignal_tail_restarts_total %d
 # TYPE gatesignal_redis_failures_total counter
 gatesignal_redis_failures_total %d
+# TYPE gatesignal_publisher_owner gauge
+gatesignal_publisher_owner %d
+# TYPE gatesignal_publisher_lease_failures_total counter
+gatesignal_publisher_lease_failures_total %d
+# TYPE gatesignal_publisher_transitions_total counter
+gatesignal_publisher_transitions_total %d
 # TYPE gatesignal_signals_detected_total counter
 gatesignal_signals_detected_total %d
 # TYPE gatesignal_signals_queued_total counter
@@ -87,8 +96,16 @@ gatesignal_analytics_outbox_depth %d
 # TYPE gatesignal_last_observation_timestamp_seconds gauge
 gatesignal_last_observation_timestamp_seconds %d
 `, ready, time.Since(m.startedAt).Seconds(), m.LinesRead.Load(), m.LinesParsed.Load(),
-		m.LinesUnmatched.Load(), m.TailRestarts.Load(), m.RedisFailures.Load(), m.SignalsDetected.Load(),
+		m.LinesUnmatched.Load(), m.TailRestarts.Load(), m.RedisFailures.Load(), boolNumber(m.PublisherOwner.Load()),
+		m.PublisherLeaseFailures.Load(), m.PublisherTransitions.Load(), m.SignalsDetected.Load(),
 		m.SignalsQueued.Load(), m.SignalsPublished.Load(), m.SignalPublishFailures.Load(), m.SignalOutboxDepth.Load(),
 		m.AnalyticsObserved.Load(), m.AnalyticsDropped.Load(), m.AnalyticsExported.Load(), m.AnalyticsExportFailures.Load(),
 		m.AnalyticsOutboxDepth.Load(), m.LastObservationUnix.Load())
+}
+
+func boolNumber(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
 }

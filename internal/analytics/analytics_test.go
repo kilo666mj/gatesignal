@@ -18,7 +18,7 @@ func TestPrivacyLimitedAggregation(t *testing.T) {
 	state := store.New(mini.Addr(), "", 0, "test")
 	t.Cleanup(func() { _ = state.Close() })
 	cfg := config.Analytics{Mode: "shadow", Sites: map[string]string{"example": "web.example.com"}, Secret: "visitor-secret", RetentionDays: 8, QueueSize: 10, TopLimit: 20, OutboxMaxItems: 100}
-	a, err := New(cfg, state, metrics.New())
+	a, err := New(cfg, state, metrics.New(), "test-pipeline", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,5 +33,26 @@ func TestPrivacyLimitedAggregation(t *testing.T) {
 	}
 	if _, err := mini.ZScore("test:analytics:web.example.com:20260909T10:paths", "/private"); err != nil {
 		t.Fatal(err)
+	}
+	bucket, err := a.snapshot(context.Background(), "test:analytics:web.example.com:20260909T10:totals")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bucket.CollectorHost != "test-pipeline" {
+		t.Fatalf("collector_host=%q, want stable pipeline identity", bucket.CollectorHost)
+	}
+	if err := a.queueExport(context.Background(), bucket); err != nil {
+		t.Fatal(err)
+	}
+	bucket.Requests++
+	if err := a.queueExport(context.Background(), bucket); err != nil {
+		t.Fatal(err)
+	}
+	count, err := state.Client().ZCard(context.Background(), "test:analytics:outbox:index").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("stable pipeline identity created %d outbox entries, want 1", count)
 	}
 }
