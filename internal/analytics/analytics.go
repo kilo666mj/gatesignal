@@ -13,7 +13,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -26,6 +25,7 @@ import (
 	"github.com/kilo666mj/gatesignal/internal/accesslog"
 	"github.com/kilo666mj/gatesignal/internal/config"
 	"github.com/kilo666mj/gatesignal/internal/metrics"
+	"github.com/kilo666mj/gatesignal/internal/publisher"
 	"github.com/kilo666mj/gatesignal/internal/store"
 )
 
@@ -45,6 +45,7 @@ type Analytics struct {
 	client           *http.Client
 	endpoint         string
 	prefix           string
+	owner            publisher.Ownership
 }
 
 type Item struct {
@@ -75,8 +76,8 @@ type Bucket struct {
 	ObservedAt         time.Time `json:"observed_at"`
 }
 
-func New(cfg config.Analytics, state *store.Store, telemetry *metrics.Metrics) (*Analytics, error) {
-	a := &Analytics{cfg: cfg, store: state, metrics: telemetry, secret: []byte(cfg.Secret), prefix: state.Key("analytics") + ":"}
+func New(cfg config.Analytics, state *store.Store, telemetry *metrics.Metrics, pipelineID string, owner publisher.Ownership) (*Analytics, error) {
+	a := &Analytics{cfg: cfg, store: state, metrics: telemetry, secret: []byte(cfg.Secret), prefix: state.Key("analytics") + ":", collectorHost: pipelineID, owner: owner}
 	if cfg.Mode == "disabled" {
 		return a, nil
 	}
@@ -92,10 +93,6 @@ func New(cfg config.Analytics, state *store.Store, telemetry *metrics.Metrics) (
 	}
 	if a.botAgents, err = compilePatterns("bot user-agent", cfg.BotAgents); err != nil {
 		return nil, err
-	}
-	a.collectorHost, err = os.Hostname()
-	if err != nil {
-		return nil, fmt.Errorf("hostname: %w", err)
 	}
 	a.staticExtensions = make(map[string]struct{}, len(cfg.StaticExtensions))
 	for _, extension := range cfg.StaticExtensions {
@@ -301,6 +298,9 @@ func (a *Analytics) visitorDigest(site, day, ip, agent string) string {
 }
 
 func (a *Analytics) export(ctx context.Context) {
+	if a.owner == nil || !a.owner.Owns() {
+		return
+	}
 	buckets, err := a.snapshots(ctx)
 	if err != nil {
 		a.fail("snapshot", err)
@@ -499,6 +499,9 @@ func (a *Analytics) flush(ctx context.Context) error {
 }
 
 func (a *Analytics) send(ctx context.Context, payload []byte) error {
+	if a.owner == nil || !a.owner.Owns() {
+		return fmt.Errorf("publisher lease not held")
+	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, a.endpoint, bytes.NewReader(payload))
 	if err != nil {
 		return err

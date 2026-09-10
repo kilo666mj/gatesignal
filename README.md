@@ -28,6 +28,7 @@ mode until the Gatehub node is registered and the former publisher is disabled.
 - Uses atomic Redis-compatible counters for HA-safe detection windows.
 - Detects configurable error-rate and suspicious-URI thresholds.
 - Keeps a bounded, durable Gatehub outbox with deterministic event IDs.
+- Elects one external publisher with a renewable Redis lease for HA deployments.
 - Produces hourly analytics with normalized paths, referrer hostnames, and
   daily one-way visitor identifiers.
 - Provides `disabled`, `shadow`, and `publish` modes independently for signals
@@ -71,6 +72,12 @@ tracked production configuration.
 
 Use a new Redis namespace when changing a shadow deployment to production.
 This prevents retained shadow aggregates from being exported after cutover.
+
+All instances in an HA pipeline must use the same `publisher.pipeline_id` and
+Redis namespace. The pipeline ID replaces the collector hostname in analytics
+bucket identity, so failover retries update the same site/hour bucket instead
+of creating a duplicate. Only the renewable lease holder sends external
+requests; non-owners continue aggregation and durable queueing.
 
 ## Log routing
 

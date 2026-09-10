@@ -20,6 +20,7 @@ Set both outputs to `shadow` and use a dedicated namespace:
 ```json
 {
   "redis": { "namespace": "gatesignal-shadow" },
+  "publisher": { "pipeline_id": "central-web" },
   "signals": { "mode": "shadow" },
   "analytics": { "mode": "shadow" }
 }
@@ -40,6 +41,12 @@ existing processor:
 Register a dedicated Gatehub node for GateSignal and configure its token file.
 Confirm that the analytics receiver accepts `source: gatesignal`. Keep the
 GateSignal outputs in shadow mode during this preparation.
+
+Before publication, run every HA instance with the same production Redis
+namespace and `publisher.pipeline_id`. Verify that exactly one instance reports
+`gatesignal_publisher_owner 1`, then exercise lease transfer by stopping that
+instance. The peer must become owner after the lease TTL without duplicating
+the deterministic signal or analytics identity.
 
 ## 4. Cut over one output at a time
 

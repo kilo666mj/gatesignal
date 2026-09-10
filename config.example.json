@@ -13,6 +13,11 @@
   "http": {
     "listen": "127.0.0.1:9194"
   },
+  "publisher": {
+    "pipeline_id": "central-web",
+    "lease_ttl_seconds": 30,
+    "renew_interval_seconds": 10
+  },
   "signals": {
     "mode": "shadow",
     "gatehub_url": "https://gatehub.example.com",

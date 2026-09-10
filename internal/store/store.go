@@ -36,6 +36,20 @@ redis.call('PEXPIRE', KEYS[1], window * 2)
 return redis.call('HMGET', KEYS[1], 'first_seen', 'last_seen', 'count', 'errors', 'successes', 'suspicious')
 `)
 
+var renewLeaseScript = redis.NewScript(`
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('PEXPIRE', KEYS[1], ARGV[2])
+end
+return 0
+`)
+
+var releaseLeaseScript = redis.NewScript(`
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+`)
+
 type Store struct {
 	client *redis.Client
 	prefix string
@@ -123,6 +137,20 @@ func (s *Store) DropQueue(ctx context.Context, key string, count int64) error {
 
 func (s *Store) QueueLength(ctx context.Context, key string) (int64, error) {
 	return s.client.LLen(ctx, key).Result()
+}
+
+func (s *Store) AcquireLease(ctx context.Context, key, token string, ttl time.Duration) (bool, error) {
+	return s.client.SetNX(ctx, key, token, ttl).Result()
+}
+
+func (s *Store) RenewLease(ctx context.Context, key, token string, ttl time.Duration) (bool, error) {
+	result, err := renewLeaseScript.Run(ctx, s.client, []string{key}, token, ttl.Milliseconds()).Int64()
+	return result == 1, err
+}
+
+func (s *Store) ReleaseLease(ctx context.Context, key, token string) (bool, error) {
+	result, err := releaseLeaseScript.Run(ctx, s.client, []string{key}, token).Int64()
+	return result == 1, err
 }
 
 func boolInt(value bool) int {

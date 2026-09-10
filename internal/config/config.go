@@ -13,8 +13,15 @@ type Config struct {
 	Inputs    []Input   `json:"inputs"`
 	Redis     Redis     `json:"redis"`
 	HTTP      HTTP      `json:"http"`
+	Publisher Publisher `json:"publisher"`
 	Signals   Signals   `json:"signals"`
 	Analytics Analytics `json:"analytics"`
+}
+
+type Publisher struct {
+	PipelineID           string `json:"pipeline_id"`
+	LeaseTTLSeconds      int    `json:"lease_ttl_seconds"`
+	RenewIntervalSeconds int    `json:"renew_interval_seconds"`
 }
 
 type Input struct {
@@ -70,8 +77,9 @@ type Analytics struct {
 
 func defaults() Config {
 	return Config{
-		Redis: Redis{Address: "127.0.0.1:6379", Namespace: "gatesignal"},
-		HTTP:  HTTP{Listen: "127.0.0.1:9194"},
+		Redis:     Redis{Address: "127.0.0.1:6379", Namespace: "gatesignal"},
+		HTTP:      HTTP{Listen: "127.0.0.1:9194"},
+		Publisher: Publisher{LeaseTTLSeconds: 30, RenewIntervalSeconds: 10},
 		Signals: Signals{Mode: "disabled", AlertConnections: 10, WindowMinutes: 2,
 			ErrorPercent: 80, PublishIntervalSeconds: 5, OutboxMaxItems: 10000},
 		Analytics: Analytics{Mode: "disabled", ExportIntervalSeconds: 300,
@@ -144,6 +152,15 @@ func (cfg Config) Validate() error {
 	}
 	if cfg.HTTP.Listen == "" {
 		return fmt.Errorf("http.listen is required")
+	}
+	publishing := cfg.Signals.Mode == "publish" || cfg.Analytics.Mode == "publish"
+	if publishing {
+		if strings.TrimSpace(cfg.Publisher.PipelineID) == "" {
+			return fmt.Errorf("publisher.pipeline_id is required when an output publishes")
+		}
+		if cfg.Publisher.LeaseTTLSeconds <= 0 || cfg.Publisher.RenewIntervalSeconds <= 0 || cfg.Publisher.RenewIntervalSeconds*2 >= cfg.Publisher.LeaseTTLSeconds {
+			return fmt.Errorf("publisher lease TTL must be positive and more than twice the renew interval")
+		}
 	}
 	if err := validateMode("signals", cfg.Signals.Mode); err != nil {
 		return err

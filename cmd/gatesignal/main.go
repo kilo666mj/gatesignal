@@ -18,6 +18,7 @@ import (
 	"github.com/kilo666mj/gatesignal/internal/config"
 	"github.com/kilo666mj/gatesignal/internal/ingest"
 	"github.com/kilo666mj/gatesignal/internal/metrics"
+	"github.com/kilo666mj/gatesignal/internal/publisher"
 	"github.com/kilo666mj/gatesignal/internal/store"
 )
 
@@ -52,11 +53,25 @@ func run(configPath string) error {
 	if err != nil {
 		return fmt.Errorf("connect to Redis: %w", err)
 	}
-	detector, err := abuse.New(cfg.Signals, state, telemetry)
+	var ownership publisher.Ownership
+	if cfg.Signals.Mode == "publish" || cfg.Analytics.Mode == "publish" {
+		lease, err := publisher.NewLease(state, telemetry, time.Duration(cfg.Publisher.LeaseTTLSeconds)*time.Second, time.Duration(cfg.Publisher.RenewIntervalSeconds)*time.Second)
+		if err != nil {
+			return err
+		}
+		leaseCtx, stopLease := context.WithCancel(ctx)
+		lease.Start(leaseCtx)
+		defer func() {
+			stopLease()
+			lease.Wait()
+		}()
+		ownership = lease
+	}
+	detector, err := abuse.New(cfg.Signals, state, telemetry, ownership)
 	if err != nil {
 		return err
 	}
-	webAnalytics, err := analytics.New(cfg.Analytics, state, telemetry)
+	webAnalytics, err := analytics.New(cfg.Analytics, state, telemetry, cfg.Publisher.PipelineID, ownership)
 	if err != nil {
 		return err
 	}

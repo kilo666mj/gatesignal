@@ -20,6 +20,7 @@ import (
 	"github.com/kilo666mj/gatesignal/internal/accesslog"
 	"github.com/kilo666mj/gatesignal/internal/config"
 	"github.com/kilo666mj/gatesignal/internal/metrics"
+	"github.com/kilo666mj/gatesignal/internal/publisher"
 	"github.com/kilo666mj/gatesignal/internal/store"
 )
 
@@ -50,10 +51,11 @@ type Detector struct {
 	suspicious []*regexp.Regexp
 	client     *http.Client
 	outboxKey  string
+	owner      publisher.Ownership
 }
 
-func New(cfg config.Signals, state *store.Store, telemetry *metrics.Metrics) (*Detector, error) {
-	d := &Detector{cfg: cfg, store: state, metrics: telemetry, client: &http.Client{Timeout: 10 * time.Second}, outboxKey: state.Key("signals", "outbox")}
+func New(cfg config.Signals, state *store.Store, telemetry *metrics.Metrics, owner publisher.Ownership) (*Detector, error) {
+	d := &Detector{cfg: cfg, store: state, metrics: telemetry, client: &http.Client{Timeout: 10 * time.Second}, outboxKey: state.Key("signals", "outbox"), owner: owner}
 	for _, pattern := range cfg.SuspiciousURIs {
 		compiled, err := regexp.Compile(pattern)
 		if err != nil {
@@ -147,6 +149,9 @@ func newSignal(event accesslog.Event, counter store.Counter, trigger string) Sig
 }
 
 func (d *Detector) publish(ctx context.Context) {
+	if d.owner == nil || !d.owner.Owns() {
+		return
+	}
 	raw, err := d.store.PeekQueue(ctx, d.outboxKey, batchSize)
 	if err != nil {
 		d.metrics.RedisFailures.Add(1)
@@ -188,6 +193,9 @@ func (d *Detector) publish(ctx context.Context) {
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", "Bearer "+d.cfg.Token)
+	if !d.owner.Owns() {
+		return
+	}
 	response, err := d.client.Do(request)
 	if err != nil {
 		d.metrics.SignalPublishFailures.Add(1)
