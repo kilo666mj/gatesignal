@@ -520,7 +520,11 @@ func (a *Analytics) send(ctx context.Context, payload []byte) error {
 	if err != nil {
 		return err
 	}
-	defer response.Body.Close()
+	defer func() {
+		if closeErr := response.Body.Close(); closeErr != nil {
+			log.Printf("close analytics response: %v", closeErr)
+		}
+	}()
 	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return fmt.Errorf("analytics endpoint returned HTTP %d", response.StatusCode)

@@ -46,7 +46,11 @@ func run(configPath string) error {
 	defer stop()
 	telemetry := metrics.New()
 	state := store.New(cfg.Redis.Address, cfg.Redis.Password, cfg.Redis.DB, cfg.Redis.Namespace)
-	defer state.Close()
+	defer func() {
+		if closeErr := state.Close(); closeErr != nil {
+			log.Printf("close Redis: %v", closeErr)
+		}
+	}()
 	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	err = state.Ping(pingCtx)
 	cancel()

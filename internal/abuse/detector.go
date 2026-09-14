@@ -202,7 +202,11 @@ func (d *Detector) publish(ctx context.Context) {
 		log.Printf("signal publish: %v", err)
 		return
 	}
-	defer response.Body.Close()
+	defer func() {
+		if closeErr := response.Body.Close(); closeErr != nil {
+			log.Printf("close signal response: %v", closeErr)
+		}
+	}()
 	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		d.metrics.SignalPublishFailures.Add(1)

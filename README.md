@@ -37,7 +37,7 @@ mode until the Gatehub node is registered and the former publisher is disabled.
 
 ## Build and test
 
-GateSignal requires Go 1.26 or newer.
+GateSignal requires Go 1.27.1 or newer.
 
 ```sh
 go build ./cmd/gatesignal
