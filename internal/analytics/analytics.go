@@ -457,7 +457,8 @@ func (a *Analytics) flush(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	a.metrics.AnalyticsOutboxDepth.Store(int64(len(ids)))
+	remaining := int64(len(ids))
+	a.metrics.AnalyticsOutboxDepth.Store(remaining)
 	now := time.Now().UTC()
 	for _, id := range ids {
 		key := a.prefix + "outbox:" + id
@@ -469,6 +470,8 @@ func (a *Analytics) flush(ctx context.Context) error {
 			if err := client.ZRem(ctx, index, id).Err(); err != nil {
 				return err
 			}
+			remaining--
+			a.metrics.AnalyticsOutboxDepth.Store(remaining)
 			continue
 		}
 		nextAttempt, _ := strconv.ParseInt(values["next_attempt"], 10, 64)
@@ -493,6 +496,8 @@ func (a *Analytics) flush(ctx context.Context) error {
 		if _, err := pipe.Exec(ctx); err != nil {
 			return err
 		}
+		remaining--
+		a.metrics.AnalyticsOutboxDepth.Store(remaining)
 		a.metrics.AnalyticsExported.Add(1)
 	}
 	return nil

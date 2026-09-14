@@ -2,6 +2,8 @@ package analytics
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +14,10 @@ import (
 	"github.com/kilo666mj/gatesignal/internal/metrics"
 	"github.com/kilo666mj/gatesignal/internal/store"
 )
+
+type testOwnership bool
+
+func (o testOwnership) Owns() bool { return bool(o) }
 
 func TestPrivacyLimitedAggregation(t *testing.T) {
 	mini := miniredis.RunT(t)
@@ -54,5 +60,40 @@ func TestPrivacyLimitedAggregation(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("stable pipeline identity created %d outbox entries, want 1", count)
+	}
+}
+
+func TestFlushUpdatesOutboxDepthAfterSuccessfulExport(t *testing.T) {
+	mini := miniredis.RunT(t)
+	state := store.New(mini.Addr(), "", 0, "test")
+	t.Cleanup(func() { _ = state.Close() })
+	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(receiver.Close)
+	telemetry := metrics.New()
+	cfg := config.Analytics{
+		Mode: "publish", Sites: map[string]string{"example": "web.example.com"},
+		Secret: "visitor-secret", URL: receiver.URL, RequestTimeoutSeconds: 5,
+		RetentionDays: 8, QueueSize: 10, TopLimit: 20, OutboxMaxItems: 100,
+	}
+	a, err := New(cfg, state, telemetry, "test-pipeline", testOwnership(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.queueExport(context.Background(), Bucket{
+		CollectorHost: "test-pipeline", Site: "web.example.com",
+		BucketStart: time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.flush(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := telemetry.AnalyticsOutboxDepth.Load(); got != 0 {
+		t.Fatalf("analytics outbox depth=%d, want 0 after successful flush", got)
+	}
+	if got := telemetry.AnalyticsExported.Load(); got != 1 {
+		t.Fatalf("analytics exports=%d, want 1", got)
 	}
 }
