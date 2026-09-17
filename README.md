@@ -15,11 +15,26 @@ pipeline: ingestion, parsing, windowed detection, aggregation, durable delivery,
 health, and metrics. General system and application alerting belongs in a
 separate log monitor.
 
+## Security boundary
+
+GateSignal is an observer and publisher, not an inline firewall. It reads
+untrusted access-log text and emits aggregate evidence; Gatehub owns policy,
+and the enforcement gates keep their own explicit rollout controls. A forged or
+malformed log line must never be treated as authentication or as proof of a
+person's identity.
+
+Raw request targets, query strings, headers, referrer URLs, user agents, and
+visitor addresses are processed in memory. Gatehub signals include a source
+address and aggregate counts because correlation requires them; analytics use
+a daily secret-derived visitor identifier instead. Protect access-log files,
+Redis state, output credentials, and the loopback-only health/metrics listener.
+
 ## Status
 
-GateSignal is ready for shadow-mode evaluation. The wire format is compatible
-with Gatehub's existing aggregate web-signal endpoint. Do not enable `publish`
-mode until the Gatehub node is registered and the former publisher is disabled.
+GateSignal supports staged shadow and publish operation. Start in shadow mode,
+verify parsing, thresholds, privacy, and HA lease transfer, then enable one
+publisher at a time. Do not enable `publish` mode until the Gatehub node is
+registered and the former publisher is disabled.
 
 ## Features
 
@@ -35,15 +50,32 @@ mode until the Gatehub node is registered and the former publisher is disabled.
   and analytics.
 - Exposes `/healthz`, `/readyz`, and Prometheus metrics.
 
-## Build and test
+## Safe quick start
 
-GateSignal requires Go 1.27.1 or newer.
+GateSignal requires Go 1.27.1 or newer and a Redis-compatible server. With a
+development Redis listening on `127.0.0.1:6379`:
 
 ```sh
-go build ./cmd/gatesignal
+go build -o gatesignal ./cmd/gatesignal
 go test -race ./...
 go vet ./...
+touch access.log
+./gatesignal -config examples/config.shadow.json
 ```
+
+The example enables only shadow signal detection. It makes no external
+requests, writes state below the `gatesignal-quickstart` Redis namespace, and
+serves health and metrics on loopback. In another terminal, append a synthetic
+nginx syslog record and inspect the counters:
+
+```sh
+printf '%s\n' '2026-09-17T10:00:00Z web.example.com nginx_example 192.0.2.10 - - [17/Sep/2026:10:00:00 +0000] "GET /.git/HEAD HTTP/2.0" 404 30 "-" "example-scanner" "-" "-"' >> access.log
+curl --fail http://127.0.0.1:9194/readyz
+curl --fail http://127.0.0.1:9194/metrics
+```
+
+Stop the process and remove the example namespace before reusing the same Redis
+database for another evaluation.
 
 ## Configuration
 
@@ -102,6 +134,13 @@ Analytics remove query strings, reduce external referrers to hostnames, and use
 a daily secret-derived digest for visitor cardinality. Raw visitor addresses and
 user agents remain transient input fields and are not stored in analytics keys
 or payloads.
+
+## Documentation
+
+- [Deployment and configuration](docs/deployment.md)
+- [Operations, recovery, and troubleshooting](docs/operations.md)
+- [Migration from an existing web-log processor](docs/migration.md)
+- [How the five Gate projects fit together](https://github.com/kilo666mj/michaelspost-docs/blob/main/docs/guides/gate-stack.md)
 
 ## License
 

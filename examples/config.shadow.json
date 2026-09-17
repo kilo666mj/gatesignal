@@ -1,0 +1,31 @@
+{
+  "inputs": [
+    {
+      "path": "./access.log",
+      "start_position": "beginning"
+    }
+  ],
+  "redis": {
+    "address": "127.0.0.1:6379",
+    "db": 0,
+    "namespace": "gatesignal-quickstart"
+  },
+  "http": {
+    "listen": "127.0.0.1:9194"
+  },
+  "signals": {
+    "mode": "shadow",
+    "alert_connections": 2,
+    "window_minutes": 2,
+    "error_percent": 50,
+    "suspicious_uris": [
+      "(?i)(?:^|/)\\.git(?:/|$)",
+      "(?i)(?:^|/)wp-login\\.php$"
+    ],
+    "publish_interval_seconds": 5,
+    "outbox_max_items": 100
+  },
+  "analytics": {
+    "mode": "disabled"
+  }
+}

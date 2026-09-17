@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
 
 func TestDefaultsValidateShadow(t *testing.T) {
 	cfg := defaults()
@@ -53,5 +56,16 @@ func TestShadowPipelineValidatesLease(t *testing.T) {
 	cfg.Publisher.LeaseTTLSeconds = 0
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("accepted configured shadow publisher without a valid lease")
+	}
+}
+
+func TestQuickStartConfigLoads(t *testing.T) {
+	path := filepath.Join("..", "..", "examples", "config.shadow.json")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Signals.Mode != "shadow" || cfg.Analytics.Mode != "disabled" {
+		t.Fatalf("unexpected quick-start modes: signals=%q analytics=%q", cfg.Signals.Mode, cfg.Analytics.Mode)
 	}
 }
