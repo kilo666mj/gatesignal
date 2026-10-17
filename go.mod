@@ -3,7 +3,7 @@ module github.com/kilo666mj/gatesignal
 go 1.27.1
 
 require (
-	github.com/alicebob/miniredis/v2 v2.39.0
+	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/nxadm/tail v1.4.11
 	github.com/redis/go-redis/v9 v9.22.0
 )
